@@ -16,7 +16,7 @@ const ConfigSchema = z.object({
 
 const fromEnv = ConfigSchema.parse(process.env)
 
-export const config = {
+export const evm_config = {
     chain: {
         source: {
             chainId: Sdk.NetworkEnum.ETHEREUM,
@@ -49,4 +49,4 @@ export const config = {
     }
 } as const
 
-export type ChainConfig = (typeof config.chain)['source' | 'destination']
+export type ChainConfig = (typeof evm_config.chain)['source' | 'destination']
