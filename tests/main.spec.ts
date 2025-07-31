@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import {expect, jest} from '@jest/globals'
-
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import {createServer, CreateServerReturnType} from 'prool'
 import {anvil} from 'prool/instances'
 
