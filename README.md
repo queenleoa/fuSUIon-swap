@@ -1,46 +1,161 @@
-# cross-chain-resolver-example
+# Cross-Chain Swap Demo: Arbitrum → Sui
 
-## Installation
+## Prerequisites
 
-Install example deps
+1. **Node.js** v18+ installed
+2. **pnpm** installed (`npm install -g pnpm`)
+3. **Foundry** installed (for fork testing): `curl -L https://foundry.paradigm.xyz | bash`
+4. **Funded accounts** (see requirements below)
+5. **Environment variables** configured
 
-```shell
+## Account Requirements
+
+### Arbitrum Mainnet (REAL FUNDS!)
+- **User Account**: 
+  - 1+ USDC for swapping
+  - 0.002+ ETH for gas fees
+- **Resolver Account**:
+  - 0.002+ ETH for gas fees (deployment + operations)
+
+### Sui Testnet
+- **User Account**: 
+  - 0.1+ SUI for receiving funds
+- **Resolver Account**:
+  - 1+ SUI for gas and safety deposits
+
+## Setup Steps
+
+### 1. Install Dependencies
+```bash
 pnpm install
 ```
 
-Install [foundry](https://book.getfoundry.sh/getting-started/installation)
+### 2. Configure Environment
+Copy `.env.example` to `.env` and fill in:
+```bash
+# Arbitrum RPC (get from Alchemy/Infura)
+ARBITRUM_RPC=https://arb-mainnet.g.alchemy.com/v2/YOUR_KEY
 
-```shell
-curl -L https://foundry.paradigm.xyz | bash
+# Private keys (64 hex chars without 0x prefix)
+EVM_USER_PRIVATE_KEY=...
+EVM_RESOLVER_PRIVATE_KEY=...
+SUI_USER_PRIVATE_KEY=...
+SUI_RESOLVER_PRIVATE_KEY=...
 ```
 
-Install contract deps
+### 3. Check Account Balances
+```bash
+pnpm run check-accounts
+```
+This will show you which accounts need funding.
 
-```shell
-forge install
+## Testing on Fork First (Recommended!)
+
+Before running on mainnet, test on a local fork:
+
+```bash
+pnpm run demo:fork
 ```
 
-## Running
+This will:
+1. Start a local Arbitrum fork using Anvil
+2. Fund test accounts automatically
+3. Run the full demo without using real funds
+4. Clean up when done
 
-To run tests you need to provide fork urls for Ethereum and Bsc
+## Running on Mainnet
 
-```shell
-SRC_CHAIN_RPC=ETH_FORK_URL DST_CHAIN_RPC=BNB_FORK_URL pnpm test
+### 1. Fund Your Accounts
+
+#### Arbitrum Mainnet:
+1. Send ETH to both accounts from an exchange or bridge
+2. Buy USDC on [Uniswap](https://app.uniswap.org) or bridge from Ethereum
+3. USDC Contract: `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`
+
+#### Sui Testnet:
+1. Get SUI from the [testnet faucet](https://discord.gg/sui)
+2. Or use the web faucet at https://sui.io/faucet
+
+### 2. Compile Contracts (if needed)
+```bash
+# If you haven't compiled the EVM contracts yet
+forge build
 ```
 
-### Public rpc
-
-| Chain    | Url                          |
-|----------|------------------------------|
-| Ethereum | https://eth.merkle.io        |
-| BSC      | wss://bsc-rpc.publicnode.com |
-
-## Test accounts
-
-### Available Accounts
-
+### 3. Run the Demo
+```bash
+pnpm run demo:evm-to-sui
 ```
-(0) 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" Owner of EscrowFactory
-(1) 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" User
-(2) 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" Resolver
-```
+
+## What Happens
+
+1. **Contract Deployment** (first run only)
+   - Deploys EscrowFactory and Resolver contracts on Arbitrum
+
+2. **Order Creation**
+   - User creates a 1 USDC swap order
+   - Order is signed with EIP-712
+
+3. **Source Escrow** (Arbitrum)
+   - Resolver fills the order through 1inch LOP
+   - Creates escrow locking the USDC
+
+4. **Destination Escrow** (Sui)
+   - Resolver creates matching escrow on Sui
+   - Locks equivalent value
+
+5. **Secret Sharing**
+   - After both escrows are confirmed
+   - Secret is revealed to enable withdrawals
+
+6. **Withdrawals**
+   - User receives funds on Sui
+   - Resolver receives funds on Arbitrum
+
+## Gas Costs (Approximate)
+
+### Arbitrum Mainnet:
+- Contract deployment: ~0.001 ETH (one time)
+- Order fill + escrow: ~0.0005 ETH
+- Withdrawal: ~0.0002 ETH
+- **Total**: ~0.002 ETH per swap (after contracts deployed)
+
+### Sui Testnet:
+- Escrow creation: ~0.01 SUI
+- Withdrawal: ~0.01 SUI
+
+## Troubleshooting
+
+### "Insufficient funds" error
+- Run `pnpm run check-accounts` to see what's missing
+- Make sure you have enough ETH/SUI for gas fees
+
+### "Nonce too high" error
+- Reset your nonce or wait for pending transactions
+
+### Contract deployment fails
+- Ensure resolver account has enough ETH (0.002+ recommended)
+
+### Sui transaction fails
+- Check that the package ID in .env matches your deployed package
+- Ensure sufficient SUI balance for gas
+
+### Fork testing issues
+- Make sure Foundry is installed: `curl -L https://foundry.paradigm.xyz | bash`
+- Check that Anvil is in your PATH
+- Ensure your Arbitrum RPC URL is valid
+
+## Important Notes
+
+⚠️ **When using mainnet, this uses REAL FUNDS!**
+- Only use amounts you can afford to lose
+- Double-check all addresses
+- Test with fork first!
+
+## Scripts
+
+- `pnpm run check-accounts` - Check all account balances
+- `pnpm run demo:fork` - Test on local Arbitrum fork (no real funds)
+- `pnpm run demo:evm-to-sui` - Run the mainnet demo
+- `pnpm run compile` - Compile Solidity contracts (if using Foundry)
+

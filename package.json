@@ -5,14 +5,15 @@
   "scripts": {
     "test": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "lint": "eslint  \"tests/**/*.ts\"",
-    "test:full": "ts-node test-sui-full-fill.ts",
     "test:all": "jest",
-    "test:complete": "tsx test-complete-sui-flow.ts",
     "test:jest": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:connection": "tsx tests/test-connection.ts",
-    "test:sui:simple": "tsx tests/test-sui-full-fill.ts",
-    "test:sui:complete": "tsx tests/test-complete-sui-flow.ts",
-    "test:evm": "pnpm test:jest main.spec.ts"
+    "check-accounts": "tsx tests/check-accounts.ts",
+    "demo:evm-to-sui": "tsx tests/demo-evm-to-sui.ts",
+    "demo:fork": "bash tests/test-on-fork.sh",
+    "test:sui-local": "tsx tests/test-sui-full-fill.ts",
+    "compile": "forge build",
+    "typechain": "typechain --target ethers-v6 --out-dir dist './out/**/*.json'"
   },
   "devDependencies": {
     "@1inch/eslint-config": "^v3.0.7",
@@ -53,6 +54,7 @@
     "@1inch/byte-utils": "2.6.0",
     "@1inch/cross-chain-sdk": "v0.1.15-rc.0",
     "@mysten/sui": "^1.37.1",
+    "chalk": "^5.4.1",
     "dotenv": "16.4.5",
     "ethers": "6.13.2",
     "prool": "0.0.24"

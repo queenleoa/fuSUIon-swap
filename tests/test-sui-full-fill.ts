@@ -48,9 +48,9 @@ async function testSuiFullFill() {
     const salt = '12345';
     
     // Amounts (in MIST - smallest unit of SUI)
-    const orderAmount = parseUnits('0.01', 9); // 1 SUI
-    const minTakingAmount = parseUnits('0.009', 9); // 0.9 SUI minimum
-    const safetyDeposit = parseUnits('0.002', 9); // 0.01 SUI
+    const orderAmount = parseUnits('0.1', 6); // 1 USDC
+    const minTakingAmount = parseUnits('0.09', 6); // 0.9 USDC minimum
+    const safetyDeposit = parseUnits('0.001', 9); // 0.01 SUI
     
      console.log('📋 Test Data:');
     console.log('  Order Hash:', orderHash.slice(0, 10) + '...');
@@ -61,10 +61,10 @@ async function testSuiFullFill() {
     try {
         // Step 1: User creates wallet
         console.log('\n1️⃣ User creating wallet...');
-        const walletId = await userResolver.createWalletSponsored(
+        const walletId = await userResolver.createWallet(
             orderHash,
             salt,
-            '0x2::sui::SUI',
+            'USDC',
             'USDC',
             orderAmount,
             minTakingAmount,
@@ -147,7 +147,7 @@ async function testSuiFullFill() {
             orderHash,
             hashlock,
             userKeypair.getPublicKey().toSuiAddress(), // maker receives
-            parseUnits('0.89', 9), // Taking amount minus fees
+            parseUnits('0.09', 6), // Taking amount minus fees
             safetyDeposit,
             {
                 srcWithdrawal: 10000n,
@@ -178,7 +178,7 @@ async function testSuiFullFill() {
         console.log('  Wallet:', walletId);
         console.log('  Source Escrow:', srcEscrowId);
         console.log('  Destination Escrow:', dstEscrowId);
-        console.log('  Amount swapped:', orderAmount.toString(), 'MIST');
+        console.log('  Amount swapped:', orderAmount.toString(), 'USDC units');
         
     } catch (error: any) {
         console.error('\n❌ Test failed:', error);

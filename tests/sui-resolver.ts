@@ -97,7 +97,7 @@ export class SuiResolver {
             dstPublicWithdrawal: bigint;
             dstCancellation: bigint;
         },
-        tokenType: string = '0x2::sui::SUI'
+        tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<string> {
         console.log('Creating wallet with order hash:', orderHash);
         
@@ -107,8 +107,12 @@ export class SuiResolver {
         const orderHashBytes = Array.from(Buffer.from(orderHash.slice(2), 'hex'));
         const hashlockBytes = Array.from(Buffer.from(hashlock.slice(2), 'hex'));
         
-        // Split coin for funding
-        const [fundingCoin] = tx.splitCoins(tx.gas, [fundingAmount]);
+        // Split from a USDC coin owned by the maker
+        const owner = this.getSignerAddress();
+        const coins = await this.client.getCoins({ owner, coinType: tokenType });
+        if (!coins.data.length) throw new Error(`No ${tokenType} coins for ${owner}`);
+        const usdcInput = tx.object(coins.data[0].coinObjectId);
+        const [fundingCoin] = tx.splitCoins(usdcInput, [fundingAmount]);
         
         tx.moveCall({
             target: `${this.packageId}::escrow_create::create_wallet`,
@@ -200,7 +204,7 @@ export class SuiResolver {
         dstPublicWithdrawal: bigint;
         dstCancellation: bigint;
     },
-    tokenType: string = '0x2::sui::SUI'
+    tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<string> {
     console.log('Creating wallet with order hash:', orderHash);
 
@@ -285,7 +289,7 @@ export class SuiResolver {
         makingAmount: bigint,
         takingAmount: bigint,
         safetyDeposit: bigint,
-        tokenType: string = '0x2::sui::SUI'
+        tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<string> {
         console.log('Creating source escrow...');
         console.log('  Wallet address:', walletAddress);
@@ -363,7 +367,7 @@ export class SuiResolver {
             dstPublicWithdrawal: bigint;
             dstCancellation: bigint;
         },
-        tokenType: string = '0x2::sui::SUI'
+        tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<string> {
         console.log('Creating destination escrow...');
         
@@ -373,11 +377,25 @@ export class SuiResolver {
         const orderHashBytes = Array.from(Buffer.from(orderHash.slice(2), 'hex'));
         const hashlockBytes = Array.from(Buffer.from(hashlock.slice(2), 'hex'));
         
-        // Split coins for token deposit and safety deposit
-        const [tokenCoin, safetyDepositCoin] = tx.splitCoins(
-            tx.gas,
-            [amount, safetyDeposit]
-        );
+        // 1) Prepare USDC coin(s)
+        const owner = this.getSignerAddress();
+        const coins = await this.client.getCoins({ owner, coinType: tokenType });
+        if (!coins.data.length) throw new Error(`No ${tokenType} coins for ${owner}`);
+        coins.data.sort((a, b) => Number(b.balance) - Number(a.balance));
+
+        const target = tx.object(coins.data[0].coinObjectId);
+        let covered = BigInt(coins.data[0].balance);
+        for (const c of coins.data.slice(1)) {
+            if (covered >= amount) break;
+            tx.mergeCoins(target, [tx.object(c.coinObjectId)]);
+            covered += BigInt(c.balance);
+        }
+        if (covered < amount) throw new Error(`Insufficient USDC: have ${covered}, need ${amount}`);
+
+        const [tokenCoin] = tx.splitCoins(target, [amount]);
+
+        // 2) Safety deposit in SUI
+        const [safetyDepositCoin] = tx.splitCoins(tx.gas, [safetyDeposit]);
         
         tx.moveCall({
             target: `${this.packageId}::escrow_create::create_escrow_dst`,
@@ -430,7 +448,7 @@ export class SuiResolver {
         escrowAddress: string,
         escrowType: 'src' | 'dst',
         secret: string,
-        tokenType: string = '0x2::sui::SUI'
+        tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<void> {
         console.log(`Withdrawing from ${escrowType} escrow ${escrowAddress}...`);
         
@@ -467,7 +485,7 @@ export class SuiResolver {
     async cancel(
         escrowAddress: string,
         escrowType: 'src' | 'dst',
-        tokenType: string = '0x2::sui::SUI'
+        tokenType: string = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC'
     ): Promise<void> {
         console.log(`Cancelling ${escrowType} escrow ${escrowAddress}...`);
         
@@ -609,7 +627,7 @@ export class SuiResolver {
     relativeMakingAmount: bigint,
         ): Promise<bigint> {
             const tx = new Transaction();
-            let tokenType ='0x2::sui::SUI';
+            let tokenType ='0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC';
 
             tx.moveCall({
             target: `${this.packageId}::utils::get_taking_amount`,
