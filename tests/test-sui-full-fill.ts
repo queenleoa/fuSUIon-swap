@@ -8,7 +8,7 @@ import { keccak256, parseUnits } from 'ethers';
 async function testSuiFullFill() {
     console.log('🚀 Testing Sui Full Fill Flow\n');
 
-    if (!process.env.SUI_USER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY_1) {
+    if (!process.env.SUI_USER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY) {
         console.error('❌ Private keys not set in .env file');
         console.log('\n📝 Please add to your .env file:');
         console.log('USER_PRIVATE_KEY=0x... (64 hex chars)');
@@ -21,7 +21,7 @@ async function testSuiFullFill() {
         Buffer.from(process.env.SUI_USER_PRIVATE_KEY.slice(2), 'hex')
     );
     const resolverKeypair = Ed25519Keypair.fromSecretKey(
-        Buffer.from(process.env.SUI_RESOLVER_PRIVATE_KEY_1.slice(2), 'hex')
+        Buffer.from(process.env.SUI_RESOLVER_PRIVATE_KEY.slice(2), 'hex')
     );
     
     // Create resolver instances

@@ -15,7 +15,7 @@ async function testConnection() {
         return;
     }
     
-    if (!process.env.SUI_USER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY_1 || !process.env.SUI_RESOLVER_PRIVATE_KEY_2 || !process.env.SUI_RESOLVER_PRIVATE_KEY_3) {
+    if (!process.env.SUI_USER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY_2 || !process.env.SUI_RESOLVER_PRIVATE_KEY_3) {
         console.error('❌ Private keys not set in .env file');
         console.log('\n📝 Please add to your .env file:');
         console.log('USER_PRIVATE_KEY=0x... (64 hex chars)');
@@ -55,7 +55,7 @@ async function testConnection() {
         console.log('   Address:', userAddress);
         
         const resolver1Keypair = Ed25519Keypair.fromSecretKey(
-            Buffer.from(process.env.SUI_RESOLVER_PRIVATE_KEY_1.slice(2), 'hex')
+            Buffer.from(process.env.SUI_RESOLVER_PRIVATE_KEY.slice(2), 'hex')
         );
         const resolver1Address = resolver1Keypair.getPublicKey().toSuiAddress();
         console.log('\n✅ Resolver 1 keypair loaded');

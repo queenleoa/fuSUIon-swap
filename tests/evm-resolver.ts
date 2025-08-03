@@ -1,5 +1,5 @@
 import {Interface, Signature, TransactionRequest} from 'ethers'
-import Sdk from '@1inch/cross-chain-sdk'
+import * as Sdk from '@1inch/cross-chain-sdk'
 import Contract from '../dist/contracts/Resolver.sol/Resolver.json'
 
 export class Resolver {
