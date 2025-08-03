@@ -21,7 +21,8 @@ async function checkAccounts() {
     
     console.log(chalk.white('\n👤 User Account:'))
     console.log(chalk.gray('   Address:'), evmUserWallet.address)
-    //console.log(chalk.gray('   ETH:'), formatEther(userEthBalance), userEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
+    
+    console.log(chalk.gray('   ETH:'), formatEther(userEthBalance), userEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
     console.log(chalk.gray('   USDC:'), formatUnits(userUsdcBalance, 6), userUsdcBalance < 1000000n ? chalk.red('❌ Need at least 1 USDC') : chalk.green('✅'))
     
     // Resolver account

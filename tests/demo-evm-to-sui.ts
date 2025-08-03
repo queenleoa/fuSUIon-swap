@@ -185,11 +185,11 @@ async function runEvmToSuiSwap() {
         config.evm.limitOrderProtocol
     )
     
-    if (allowance < parseUnits('1', 6)) {
+    if (allowance < parseUnits('0.1', 6)) {
         await evmUser.approveToken(
             config.evm.tokens.USDC.address,
             config.evm.limitOrderProtocol,
-            parseUnits('1000', 6) // Approve 1000 USDC
+            parseUnits('0.1', 6) // Approve 1 USDC
         )
         log.success('USDC approved')
     } else {
@@ -199,12 +199,12 @@ async function runEvmToSuiSwap() {
     // Create order
     log.step(4, 'Creating cross-chain swap order')
     
-    const swapAmount = parseUnits('1', 6) // 1 USDC
-    const minReceiveAmount = parseUnits('0.99', 6) // 0.99 USDC minimum (1% slippage)
+    const swapAmount = parseUnits('0.1', 6) // 1 USDC
+    const minReceiveAmount = parseUnits('0.09', 6) // 0.99 USDC minimum (1% slippage)
     const secret = uint8ArrayToHex(randomBytes(32))
     
-    log.info('Swap Amount', '1 USDC')
-    log.info('Min Receive', '0.9 USDC')
+    log.info('Swap Amount', '0.1 USDC')
+    log.info('Min Receive', '0.09 USDC')
     log.info('Secret', secret.slice(0, 10) + '...')
     
     const currentTimestamp = BigInt(Math.floor(Date.now() / 1000))
@@ -282,12 +282,18 @@ async function runEvmToSuiSwap() {
             fillAmount
         )
     )
-    
-    log.tx('Fill transaction', fillTxHash)
-    
-    // Get escrow address from events
+  
+        // ✅ Wait for transaction to be mined and get reliable block hash
+    const receipt = await evmProvider.getTransactionReceipt(fillTxHash)
+    if (!receipt || receipt.status !== 1) {
+        throw new Error(`Transaction ${fillTxHash} failed or not yet mined`)
+    }
+
+    const srcescrowBlockHash = receipt.blockHash
+
+    // ✅ Now pass this correct block hash into the EscrowFactory
     const escrowFactory = new EscrowFactory(evmProvider, escrowFactoryAddress)
-    const [srcImmutables, complement] = await escrowFactory.getSrcDeployEvent(srcBlockHash)
+    const [srcImmutables, complement] = await escrowFactory.getSrcDeployEvent(srcescrowBlockHash)
     
     const ESCROW_SRC_IMPL = await escrowFactory.getSourceImpl()
     const srcEscrowAddress = new Sdk.EscrowFactory(new Address(escrowFactoryAddress)).getSrcEscrowAddress(
@@ -323,7 +329,7 @@ async function runEvmToSuiSwap() {
         orderHash,
         Sdk.HashLock.forSingleFill(secret).toString(),
         suiUserKeypair.getPublicKey().toSuiAddress(),
-        parseUnits('0.99', 6), // Convert to usd decimal places
+        parseUnits('0.099', 6), // Convert to usd decimal places
         parseUnits(config.swap.safetyDeposit.sui, 9),
         timelockMs
     )
@@ -355,8 +361,8 @@ async function runEvmToSuiSwap() {
     // Summary
     log.title('✅ Swap Completed Successfully!')
     console.log(chalk.white('\n📊 Summary:'))
-    console.log(chalk.gray('  • ') + chalk.white('From:'), chalk.cyan('1.0 USDC on Arbitrum'))
-    console.log(chalk.gray('  • ') + chalk.white('To:'), chalk.cyan('0.99 USDC equivalent on Sui'))
+    console.log(chalk.gray('  • ') + chalk.white('From:'), chalk.cyan('0.10 USDC on Arbitrum'))
+    console.log(chalk.gray('  • ') + chalk.white('To:'), chalk.cyan('0.099 USDC equivalent on Sui'))
     console.log(chalk.gray('  • ') + chalk.white('User:'), chalk.yellow(evmUserWallet.address))
     console.log(chalk.gray('  • ') + chalk.white('Source Escrow:'), chalk.gray(srcEscrowAddress.toString()))
     console.log(chalk.gray('  • ') + chalk.white('Destination Escrow:'), chalk.gray(dstEscrowId))

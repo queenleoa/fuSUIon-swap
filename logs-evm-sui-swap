@@ -1,0 +1,62 @@
+
+============================================================
+🔄 Cross-Chain Swap Demo: Arbitrum → Sui
+============================================================
+   Mode: Running on mainnet - REAL FUNDS!
+
+1️⃣  Setting up wallets and connections
+   EVM User Address: 0xB7c7d54BCB5b686B98bEdd18452dd03dFC880b58
+   EVM Resolver Address: 0x2C8d319460f0907F1Db1F873D6A2b7BD31631Afd
+   EVM User ETH Balance: 0.004579027125903919 ETH
+   EVM Resolver ETH Balance: 0.004339117965668597 ETH
+   Sui User Address: 0xd47362e26647423dd9ba6f7153db7651e2d8d4a0113a9e0cfd3b03d2b89f5054
+   Sui Resolver Address: 0x71d90cf1fb4ef738ef940125fce0046f780ba5b7f07863b348ff7e61be12299c
+
+2️⃣  Setting up contracts on Arbitrum
+   Using existing Escrow Factory: 0x58Af42C0c8901a966f188AefD166EC3276868c60
+   Using existing Resolver Contract: 0x36513f10AaFCB628B53D4f7c49662b006765365B
+   User USDC Balance: 4.375247 USDC
+
+3️⃣  Approving USDC to Limit Order Protocol
+   USDC already approved: 0.4 USDC
+
+4️⃣  Creating cross-chain swap order
+   Swap Amount: 0.1 USDC
+   Min Receive: 0.09 USDC
+   Secret: 0x05f3cc80...
+   Order Hash: 0xd3bec84d...
+   ✅ Order signed
+
+5️⃣  Creating source escrow on Arbitrum
+   ✅ Source escrow created at 0x082164c3b6c666608d277ac3dcc16b95c7b74f3b
+
+6️⃣  Creating destination escrow on Sui
+Creating destination escrow...
+✅ Destination escrow created at: 0xba37cbce4173baa9de1fb6d812f5e2069cbfe497ec9685a73587c7da364e3012
+   ✅ Destination escrow created at 0xba37cbce4173baa9de1fb6d812f5e2069cbfe497ec9685a73587c7da364e3012
+   ⏳ Waiting for finality locks (30s)
+                                                  
+7️⃣  Sharing secret with resolvers
+   Secret revealed: 0x05f3cc8001059846de415621fb0a645658c6e0358684c245b8e226a7ebbcaf54
+   ✅ Both escrows verified and secret shared
+
+8️⃣  Withdrawing funds on Sui (user receives funds)
+Withdrawing from dst escrow 0xba37cbce4173baa9de1fb6d812f5e2069cbfe497ec9685a73587c7da364e3012...
+✅ Withdrawal successful: 9Vxx7HMzvxVQFnDFbXoyLeT9JamunQgjpFs3FZwCPDGz
+   ✅ User received funds on Sui
+
+9️⃣  Withdrawing funds on Arbitrum (resolver receives funds)
+   📝 Withdraw transaction: 0xa6001625d19ee28ff93525631d9678ecb7b7829c06920345199dcb6e1b1f9bbc
+   ✅ Resolver received funds on Arbitrum
+
+============================================================
+✅ Swap Completed Successfully!
+============================================================
+
+📊 Summary:
+  • From: 0.10 USDC on Arbitrum
+  • To: 0.099 USDC equivalent on Sui
+  • User: 0xB7c7d54BCB5b686B98bEdd18452dd03dFC880b58
+  • Source Escrow: 0x082164c3b6c666608d277ac3dcc16b95c7b74f3b
+  • Destination Escrow: 0xba37cbce4173baa9de1fb6d812f5e2069cbfe497ec9685a73587c7da364e3012
+  • Time: ~1 minute
