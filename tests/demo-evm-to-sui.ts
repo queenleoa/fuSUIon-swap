@@ -203,8 +203,8 @@ async function runEvmToSuiSwap() {
     const minReceiveAmount = parseUnits('0.99', 6) // 0.99 USDC minimum (1% slippage)
     const secret = uint8ArrayToHex(randomBytes(32))
     
-    log.info('Swap Amount', '1.0 USDC')
-    log.info('Min Receive', '0.99 USDC')
+    log.info('Swap Amount', '1 USDC')
+    log.info('Min Receive', '0.9 USDC')
     log.info('Secret', secret.slice(0, 10) + '...')
     
     const currentTimestamp = BigInt(Math.floor(Date.now() / 1000))
@@ -323,7 +323,7 @@ async function runEvmToSuiSwap() {
         orderHash,
         Sdk.HashLock.forSingleFill(secret).toString(),
         suiUserKeypair.getPublicKey().toSuiAddress(),
-        parseUnits('0.99', 9), // Convert to SUI decimal places
+        parseUnits('0.99', 6), // Convert to usd decimal places
         parseUnits(config.swap.safetyDeposit.sui, 9),
         timelockMs
     )
