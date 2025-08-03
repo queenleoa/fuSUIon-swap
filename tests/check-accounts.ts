@@ -9,32 +9,32 @@ import ERC20 from '../dist/contracts/IERC20.sol/IERC20.json'
 async function checkAccounts() {
     console.log(chalk.bold.cyan('\n🔍 Checking Account Balances\n'))
     
-    // // Check EVM accounts
-    // console.log(chalk.bold.yellow('Arbitrum Mainnet Accounts:'))
-    // const evmProvider = new JsonRpcProvider(config.evm.rpc)
+    // Check EVM accounts
+    console.log(chalk.bold.yellow('Arbitrum Mainnet Accounts:'))
+    const evmProvider = new JsonRpcProvider(config.evm.rpc)
     
-    // // User account
-    // const evmUserWallet = new Wallet(config.evm.accounts.user.privateKey, evmProvider)
-    // const userEthBalance = await evmProvider.getBalance(evmUserWallet.address)
-    // const usdcContract = new Contract(config.evm.tokens.USDC.address, ERC20.abi, evmProvider)
-    // const userUsdcBalance = await usdcContract.balanceOf(evmUserWallet.address)
+    // User account
+    const evmUserWallet = new Wallet(config.evm.accounts.user.privateKey, evmProvider)
+    const userEthBalance = await evmProvider.getBalance(evmUserWallet.address)
+    const usdcContract = new Contract(config.evm.tokens.USDC.address, ERC20.abi, evmProvider)
+    const userUsdcBalance = await usdcContract.balanceOf(evmUserWallet.address)
     
-    // console.log(chalk.white('\n👤 User Account:'))
-    // console.log(chalk.gray('   Address:'), evmUserWallet.address)
-    // console.log(chalk.gray('   ETH:'), formatEther(userEthBalance), userEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
-    // console.log(chalk.gray('   USDC:'), formatUnits(userUsdcBalance, 6), userUsdcBalance < 1000000n ? chalk.red('❌ Need at least 1 USDC') : chalk.green('✅'))
+    console.log(chalk.white('\n👤 User Account:'))
+    console.log(chalk.gray('   Address:'), evmUserWallet.address)
+    //console.log(chalk.gray('   ETH:'), formatEther(userEthBalance), userEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
+    console.log(chalk.gray('   USDC:'), formatUnits(userUsdcBalance, 6), userUsdcBalance < 1000000n ? chalk.red('❌ Need at least 1 USDC') : chalk.green('✅'))
     
-    // // Resolver account
-    // const evmResolverWallet = new Wallet(config.evm.accounts.resolver.privateKey, evmProvider)
-    // const resolverEthBalance = await evmProvider.getBalance(evmResolverWallet.address)
-    // const resolverUsdcBalance = await usdcContract.balanceOf(evmResolverWallet.address)
+    // Resolver account
+    const evmResolverWallet = new Wallet(config.evm.accounts.resolver.privateKey, evmProvider)
+    const resolverEthBalance = await evmProvider.getBalance(evmResolverWallet.address)
+    const resolverUsdcBalance = await usdcContract.balanceOf(evmResolverWallet.address)
     
-    // console.log(chalk.white('\n🤖 Resolver Account:'))
-    // console.log(chalk.gray('   Address:'), evmResolverWallet.address)
-    // console.log(chalk.gray('   ETH:'), formatEther(resolverEthBalance), resolverEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
-    // console.log(chalk.gray('   USDC:'), formatUnits(resolverUsdcBalance, 6))
+    console.log(chalk.white('\n🤖 Resolver Account:'))
+    console.log(chalk.gray('   Address:'), evmResolverWallet.address)
+    console.log(chalk.gray('   ETH:'), formatEther(resolverEthBalance), resolverEthBalance < 2000000000000000n ? chalk.red('❌ Need at least 0.002 ETH') : chalk.green('✅'))
+    console.log(chalk.gray('   USDC:'), formatUnits(resolverUsdcBalance, 6))
     
-    // Check Sui accounts
+    //Check Sui accounts
     console.log(chalk.bold.yellow('\n\nSui Testnet Accounts:'))
     const suiClient = new SuiClient({ url: config.sui.rpc })
     

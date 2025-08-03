@@ -1,161 +1,57 @@
-# Cross-Chain Swap Demo: Arbitrum → Sui
+How it’s made
 
-## Prerequisites
+Sui Move package (escrow/)
 
-1. **Node.js** v18+ installed
-2. **pnpm** installed (`npm install -g pnpm`)
-3. **Foundry** installed (for fork testing): `curl -L https://foundry.paradigm.xyz | bash`
-4. **Funded accounts** (see requirements below)
-5. **Environment variables** configured
+Core objects
 
-## Account Requirements
+Wallet<T> (shared): funds + immutables — order_hash, salt, maker/taker strings, making_amount (start/high), taking_amount (end/low), duration, hashlock/Merkle root, allow_partial_fills, parts_amount, last_used_index, timelocks, created_at, is_active, and balances (token + SUI safety deposits).
 
-### Arbitrum Mainnet (REAL FUNDS!)
-- **User Account**: 
-  - 1+ USDC for swapping
-  - 0.002+ ETH for gas fees
-- **Resolver Account**:
-  - 0.002+ ETH for gas fees (deployment + operations)
+EscrowSrc<T> / EscrowDst<T> (shared): per-resolver escrows with compact EscrowImmutables, token balance, safety deposit, created_at, status.
 
-### Sui Testnet
-- **User Account**: 
-  - 0.1+ SUI for receiving funds
-- **Resolver Account**:
-  - 1+ SUI for gas and safety deposits
+Timelocks: relative ms windows for staged withdraw/cancel: resolver-exclusive → public on both chains.
 
-## Setup Steps
+Lifecycle modules
 
-### 1. Install Dependencies
-```bash
-pnpm install
-```
+escrow_create.move: create_wallet (maker pre-funds) and create_escrow_src (resolver debits Wallet). Validates Merkle proof or hashlock, current Dutch price, balances, and safety deposits, then emits events.
 
-### 2. Configure Environment
-Copy `.env.example` to `.env` and fill in:
-```bash
-# Arbitrum RPC (get from Alchemy/Infura)
-ARBITRUM_RPC=https://arb-mainnet.g.alchemy.com/v2/YOUR_KEY
+escrow_withdraw.move / escrow_cancel.move: stage-gated flows using clock::timestamp_ms + relative timelocks; full fills require secret; partial fills verify (leaf, proof, index) against the Wallet’s Merkle root; public phases unlock after grace windows.
 
-# Private keys (64 hex chars without 0x prefix)
-EVM_USER_PRIVATE_KEY=...
-EVM_RESOLVER_PRIVATE_KEY=...
-SUI_USER_PRIVATE_KEY=...
-SUI_RESOLVER_PRIVATE_KEY=...
-```
+escrow_rescue.move: post-public-cancel cleanup to reclaim storage rebates and tear down Wallet/Escrow.
 
-### 3. Check Account Balances
-```bash
-pnpm run check-accounts
-```
-This will show you which accounts need funding.
+escrow_utils.move: Dutch-auction math (1inch-style linear interpolation), get_making_amount/get_taking_amount, timelock validation (monotonicity + cross-chain ordering), stage computation, and immutables checks.
 
-## Testing on Fork First (Recommended!)
+escrow_events.move: lightweight, copy-only events for creation/withdraw/cancel.
 
-Before running on mainnet, test on a local fork:
+Testing
 
-```bash
-pnpm run demo:fork
-```
+Move tests cover: multi-part partial fills (bucketed indices), Merkle proof validation, Dutch pricing at time t, resolver/public stage transitions, safety-deposit thresholds, cancel/withdraw correctness, and rescue.
 
-This will:
-1. Start a local Arbitrum fork using Anvil
-2. Fund test accounts automatically
-3. Run the full demo without using real funds
-4. Clean up when done
+Off-chain orchestration (TypeScript, tests/)
 
-## Running on Mainnet
+Sui PTB path (sui-integration.ts): builds Programmable Transaction Blocks to create wallets/escrows and execute withdraw/cancel per stage; signs with user/resolver keys; polls finality.
 
-### 1. Fund Your Accounts
+Order builder (cross-chain-order-builder.ts): generates secrets + keccak256 hashlocks, computes auction bounds; falls back to manual hashing when SDK imports aren’t available.
 
-#### Arbitrum Mainnet:
-1. Send ETH to both accounts from an exchange or bridge
-2. Buy USDC on [Uniswap](https://app.uniswap.org) or bridge from Ethereum
-3. USDC Contract: `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`
+EVM helpers (evm-wallet.ts): ethers-based balance/approval/tx utilities. Destination leg interacts with Solidity contracts that use factory + minimal-proxy patterns for gas efficiency and isolation.
 
-#### Sui Testnet:
-1. Get SUI from the [testnet faucet](https://discord.gg/sui)
-2. Or use the web faucet at https://sui.io/faucet
+Integration spec (cross-chain-integration-spec.ts & test-complete-sui-flow.ts): end-to-end flow against Arbitrum mainnet and Sui testnet—build order → create Sui Wallet → resolver fills (Sui PTB + EVM call) → withdraw/cancel/rescue.
 
-### 2. Compile Contracts (if needed)
-```bash
-# If you haven't compiled the EVM contracts yet
-forge build
-```
+Why these design decisions are better on Sui
 
-### 3. Run the Demo
-```bash
-pnpm run demo:evm-to-sui
-```
+Pre-funded shared Wallet<T> instead of replayable signed PTBs.
+Sui PTBs are tied to object versions; a pre-funded Wallet avoids stale signatures while enabling asynchronous resolver competition. It guarantees liveness with the maker offline and gives one canonical balance/nonce/parts map to enforce fills.
 
-## What Happens
+Relative timelocks + on-chain stage machine.
+Using relative ms windows and deriving absolute gates from clock::timestamp_ms keeps the immutables compact and avoids “creation-time drift.” It cleanly separates resolver-exclusive and public phases on both chains.
 
-1. **Contract Deployment** (first run only)
-   - Deploys EscrowFactory and Resolver contracts on Arbitrum
+Dutch pricing computed in Move (no oracle).
+The module recomputes the current taking/making amount from created_at+duration deterministically, so every resolver faces the same price curve—no off-chain disputes, no desync.
 
-2. **Order Creation**
-   - User creates a 1 USDC swap order
-   - Order is signed with EIP-712
+Merkle-root partial fills with index discipline.
+Compresses N secrets to one root; each fill proves membership and advances last_used_index. This makes partial fills cheap, parallelizable, and abuse-resistant without minting per-part objects.
 
-3. **Source Escrow** (Arbitrum)
-   - Resolver fills the order through 1inch LOP
-   - Creates escrow locking the USDC
+Safety deposits & rescue path.
+Deposits align incentives (discourage spam/abandonment) and rescue reclaims storage, so long-lived orders don’t turn into permanent state bloat—a direct fit for Sui’s storage-rebate model.
 
-4. **Destination Escrow** (Sui)
-   - Resolver creates matching escrow on Sui
-   - Locks equivalent value
-
-5. **Secret Sharing**
-   - After both escrows are confirmed
-   - Secret is revealed to enable withdrawals
-
-6. **Withdrawals**
-   - User receives funds on Sui
-   - Resolver receives funds on Arbitrum
-
-## Gas Costs (Approximate)
-
-### Arbitrum Mainnet:
-- Contract deployment: ~0.001 ETH (one time)
-- Order fill + escrow: ~0.0005 ETH
-- Withdrawal: ~0.0002 ETH
-- **Total**: ~0.002 ETH per swap (after contracts deployed)
-
-### Sui Testnet:
-- Escrow creation: ~0.01 SUI
-- Withdrawal: ~0.01 SUI
-
-## Troubleshooting
-
-### "Insufficient funds" error
-- Run `pnpm run check-accounts` to see what's missing
-- Make sure you have enough ETH/SUI for gas fees
-
-### "Nonce too high" error
-- Reset your nonce or wait for pending transactions
-
-### Contract deployment fails
-- Ensure resolver account has enough ETH (0.002+ recommended)
-
-### Sui transaction fails
-- Check that the package ID in .env matches your deployed package
-- Ensure sufficient SUI balance for gas
-
-### Fork testing issues
-- Make sure Foundry is installed: `curl -L https://foundry.paradigm.xyz | bash`
-- Check that Anvil is in your PATH
-- Ensure your Arbitrum RPC URL is valid
-
-## Important Notes
-
-⚠️ **When using mainnet, this uses REAL FUNDS!**
-- Only use amounts you can afford to lose
-- Double-check all addresses
-- Test with fork first!
-
-## Scripts
-
-- `pnpm run check-accounts` - Check all account balances
-- `pnpm run demo:fork` - Test on local Arbitrum fork (no real funds)
-- `pnpm run demo:evm-to-sui` - Run the mainnet demo
-- `pnpm run compile` - Compile Solidity contracts (if using Foundry)
-
+Right primitive per chain.
+Sui uses PTBs to mutate objects atomically at submission time; EVM uses Solidity contracts + proxies to settle fills with the familiar allowance/permit tooling. Each side leverages its chain’s strengths.
