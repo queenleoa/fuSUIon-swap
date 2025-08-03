@@ -45,6 +45,20 @@ export const evm_config = {
                     donor: '0x4188663a85C92EEa35b5AD3AA5cA7CeB237C6fe9'
                 }
             }
+        },
+        arbitrum: {
+            chainId: Sdk.NetworkEnum.ARBITRUM,
+            url: fromEnv.ARBITRUM_RPC,
+            createFork: fromEnv.ARBITRUM_CREATE_FORK,
+            limitOrderProtocol: "0x111111125421ca6dc452d289314280a0f8842a65", //lop address from orderregistrar
+            wrappedNative: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', //weth
+            ownerPrivateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', //owner of escrow factory (look into this)
+            tokens: {
+                USDC: {
+                    address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',//usdc address
+                    donor: '0x4188663a85C92EEa35b5AD3AA5cA7CeB237C6fe9' //need to use my account address
+                }
+            }
         }
     }
 } as const

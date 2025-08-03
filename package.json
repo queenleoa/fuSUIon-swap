@@ -4,7 +4,15 @@
   "description": "Example of 1inch cross chain resolver",
   "scripts": {
     "test": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
-    "lint": "eslint  \"tests/**/*.ts\""
+    "lint": "eslint  \"tests/**/*.ts\"",
+    "test:full": "ts-node test-sui-full-fill.ts",
+    "test:all": "jest",
+    "test:complete": "tsx test-complete-sui-flow.ts",
+    "test:jest": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:connection": "tsx tests/test-connection.ts",
+    "test:sui:simple": "tsx tests/test-sui-full-fill.ts",
+    "test:sui:complete": "tsx tests/test-complete-sui-flow.ts",
+    "test:evm": "pnpm test:jest main.spec.ts"
   },
   "devDependencies": {
     "@1inch/eslint-config": "^v3.0.7",
@@ -30,6 +38,7 @@
     "eslint-plugin-unused-imports": "^4.1.4",
     "jest": "29.7.0",
     "prettier": "^3.2.5",
+    "tsx": "^4.20.3",
     "typescript": "5.5.2",
     "zod": "3.23.8"
   },

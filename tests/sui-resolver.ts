@@ -158,7 +158,8 @@ export class SuiResolver {
         console.log('✅ Wallet created at:', walletId);
 
         // Add delay for object propagation
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('⏳ Waiting for object to be indexed...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         return walletId;
     }
@@ -178,6 +179,10 @@ export class SuiResolver {
         tokenType: string = '0x2::sui::SUI'
     ): Promise<string> {
         console.log('Creating source escrow...');
+        console.log('  Wallet address:', walletAddress);
+        console.log('  Making amount:', makingAmount.toString());
+        console.log('  Taking amount:', takingAmount.toString());
+        console.log('  Taker:', taker);
         
         const tx = new Transaction();
         
@@ -391,42 +396,67 @@ export class SuiResolver {
             });
 
             if (!response.data || !response.data.content || response.data.content.dataType !== 'moveObject') {
+                console.error('Object not found or not a Move object');
                 return null;
             }
 
             const fields = response.data.content.fields as any;
             
+            // Debug logging
+            console.log('Raw wallet fields:', JSON.stringify(fields, null, 2));
+            
+            // Helper function to safely convert to BigInt
+            const toBigInt = (value: any): bigint => {
+                if (value === undefined || value === null) {
+                    console.warn('Value is undefined/null, defaulting to 0');
+                    return BigInt(0);
+                }
+                return BigInt(value.toString());
+            };
+            
+            // Helper to convert byte array or base64 to hex
+            const toHex = (value: any): string => {
+                if (Array.isArray(value)) {
+                    return '0x' + Buffer.from(value).toString('hex');
+                } else if (typeof value === 'string') {
+                    // Might be base64 encoded
+                    return '0x' + Buffer.from(value, 'base64').toString('hex');
+                }
+                return '0x' + value.toString('hex');
+            };
+            
             return {
                 id: walletId,
-                orderHash: '0x' + Buffer.from(fields.order_hash).toString('hex'),
-                salt: fields.salt,
+                orderHash: toHex(fields.order_hash),
+                salt: fields.salt || '0',
                 maker: fields.maker,
                 makerAsset: fields.maker_asset,
                 takerAsset: fields.taker_asset,
-                makingAmount: BigInt(fields.making_amount),
-                takingAmount: BigInt(fields.taking_amount),
-                duration: BigInt(fields.duration),
-                hashlock: '0x' + Buffer.from(fields.hashlock).toString('hex'),
+                makingAmount: toBigInt(fields.making_amount),
+                takingAmount: toBigInt(fields.taking_amount),
+                duration: toBigInt(fields.duration),
+                hashlock: toHex(fields.hashlock),
                 timelocks: {
-                    srcWithdrawal: BigInt(fields.timelocks.src_withdrawal),
-                    srcPublicWithdrawal: BigInt(fields.timelocks.src_public_withdrawal),
-                    srcCancellation: BigInt(fields.timelocks.src_cancellation),
-                    srcPublicCancellation: BigInt(fields.timelocks.src_public_cancellation),
-                    dstWithdrawal: BigInt(fields.timelocks.dst_withdrawal),
-                    dstPublicWithdrawal: BigInt(fields.timelocks.dst_public_withdrawal),
-                    dstCancellation: BigInt(fields.timelocks.dst_cancellation),
+                    srcWithdrawal: toBigInt(fields.timelocks?.fields?.src_withdrawal || fields.timelocks?.src_withdrawal),
+                    srcPublicWithdrawal: toBigInt(fields.timelocks?.fields?.src_public_withdrawal || fields.timelocks?.src_public_withdrawal),
+                    srcCancellation: toBigInt(fields.timelocks?.fields?.src_cancellation || fields.timelocks?.src_cancellation),
+                    srcPublicCancellation: toBigInt(fields.timelocks?.fields?.src_public_cancellation || fields.timelocks?.src_public_cancellation),
+                    dstWithdrawal: toBigInt(fields.timelocks?.fields?.dst_withdrawal || fields.timelocks?.dst_withdrawal),
+                    dstPublicWithdrawal: toBigInt(fields.timelocks?.fields?.dst_public_withdrawal || fields.timelocks?.dst_public_withdrawal),
+                    dstCancellation: toBigInt(fields.timelocks?.fields?.dst_cancellation || fields.timelocks?.dst_cancellation),
                 },
-                srcSafetyDeposit: BigInt(fields.src_safety_deposit_amount),
-                dstSafetyDeposit: BigInt(fields.dst_safety_deposit_amount),
-                allowPartialFills: fields.allow_partial_fills,
-                partsAmount: fields.parts_amount,
-                lastUsedIndex: fields.last_used_index,
-                balance: BigInt(fields.balance.value || 0),
-                createdAt: BigInt(fields.created_at),
-                isActive: fields.is_active
+                srcSafetyDeposit: toBigInt(fields.src_safety_deposit_amount),
+                dstSafetyDeposit: toBigInt(fields.dst_safety_deposit_amount),
+                allowPartialFills: fields.allow_partial_fills || false,
+                partsAmount: Number(fields.parts_amount || 0),
+                lastUsedIndex: Number(fields.last_used_index || 255),
+                balance: toBigInt(fields.balance?.fields?.value || fields.balance?.value || fields.balance || 0),
+                createdAt: toBigInt(fields.created_at),
+                isActive: fields.is_active !== undefined ? fields.is_active : true
             };
         } catch (error) {
-            console.error('Failed to get wallet info:', error);
+            console.error('Failed to parse wallet info:', error);
+            console.error('Error details:', error);
             return null;
         }
     }
@@ -465,36 +495,38 @@ export class SuiResolver {
     /**
      * Get current taking amount based on Dutch auction
      */
-    getCurrentTakingAmount(
-        walletInfo: WalletInfo,
-        makingAmount: bigint,
-        currentTime?: number
-    ): bigint {
-        const now = currentTime || Date.now();
-        const startTime = Number(walletInfo.createdAt);
-        const duration = Number(walletInfo.duration);
-        const endTime = startTime + duration;
-        
-        // Clamp current time
-        const t = Math.max(startTime, Math.min(now, endTime));
-        
-        // Linear interpolation
-        const progress = BigInt(t - startTime);
-        const totalDuration = BigInt(endTime - startTime);
-        
-        if (totalDuration === 0n) {
-            return walletInfo.makingAmount; // No duration, use max price
+    async getCurrentTakingAmount(
+    wallet: WalletInfo,
+    relativeMakingAmount: bigint,
+        ): Promise<bigint> {
+            const tx = new Transaction();
+            let tokenType ='0x2::sui::SUI';
+
+            tx.moveCall({
+            target: `${this.packageId}::utils::get_taking_amount`,
+            typeArguments: [tokenType],
+            arguments: [
+                tx.object(wallet.id),          // &Wallet<T>
+                tx.pure.u64(relativeMakingAmount),   // making_amount (u64)
+                tx.object(SUI_CLOCK_OBJECT_ID),                 // &Clock
+            ],
+            });
+
+            /* dev-inspect is a free local VM run – perfect for reads */
+            const dev = await this.client.devInspectTransactionBlock({
+            sender: this.getSignerAddress(),
+            transactionBlock: tx,
+            });
+
+            const raw = dev.results?.[0]?.returnValues?.[0];
+            if (!raw) throw new Error('No return value from get_taking_amount');
+
+            const [bytes] = raw;                                 // [Uint8Array, tag]
+            const taking  =Buffer.from(bytes).readBigUInt64LE(0);              // BigInt  ➟  correct value
+
+            return taking;
         }
-        
-        // Calculate taking amount at current time
-        const startAmount = walletInfo.makingAmount; // Start high (1:1)
-        const endAmount = walletInfo.takingAmount;   // End low (minimum)
-        
-        const currentTaking = (startAmount * (totalDuration - progress) + endAmount * progress) / totalDuration;
-        
-        // Scale by the actual making amount requested
-        return (currentTaking * makingAmount) / walletInfo.makingAmount;
-    }
+
 
     /**
      * Helper to build merkle tree (for testing partial fills)

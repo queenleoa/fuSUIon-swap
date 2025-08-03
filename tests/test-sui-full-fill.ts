@@ -4,15 +4,24 @@ import { SuiResolver } from './sui-resolver';
 import { randomBytes } from 'crypto';
 import { keccak256, parseUnits } from 'ethers';
 
+
 async function testSuiFullFill() {
     console.log('🚀 Testing Sui Full Fill Flow\n');
+
+    if (!process.env.SUI_USER_PRIVATE_KEY || !process.env.SUI_RESOLVER_PRIVATE_KEY_1) {
+        console.error('❌ Private keys not set in .env file');
+        console.log('\n📝 Please add to your .env file:');
+        console.log('USER_PRIVATE_KEY=0x... (64 hex chars)');
+        console.log('RESOLVER_PRIVATE_KEY=0x... (64 hex chars)');
+        return;
+    }
     
     // Setup keypairs
     const userKeypair = Ed25519Keypair.fromSecretKey(
-        Buffer.from(process.env.USER_PRIVATE_KEY!.slice(2), 'hex')
+        Buffer.from(process.env.SUI_USER_PRIVATE_KEY.slice(2), 'hex')
     );
     const resolverKeypair = Ed25519Keypair.fromSecretKey(
-        Buffer.from(process.env.RESOLVER_PRIVATE_KEY_1!.slice(2), 'hex')
+        Buffer.from(process.env.SUI_RESOLVER_PRIVATE_KEY_1.slice(2), 'hex')
     );
     
     // Create resolver instances
@@ -39,11 +48,11 @@ async function testSuiFullFill() {
     const salt = '12345';
     
     // Amounts (in MIST - smallest unit of SUI)
-    const orderAmount = parseUnits('1', 9); // 1 SUI
-    const minTakingAmount = parseUnits('0.9', 9); // 0.9 SUI minimum
-    const safetyDeposit = parseUnits('0.01', 9); // 0.01 SUI
+    const orderAmount = parseUnits('0.01', 9); // 1 SUI
+    const minTakingAmount = parseUnits('0.009', 9); // 0.9 SUI minimum
+    const safetyDeposit = parseUnits('0.002', 9); // 0.01 SUI
     
-    console.log('📋 Test Data:');
+     console.log('📋 Test Data:');
     console.log('  Order Hash:', orderHash.slice(0, 10) + '...');
     console.log('  Secret:', secret.slice(0, 10) + '...');
     console.log('  Hashlock:', hashlock.slice(0, 10) + '...');
@@ -71,7 +80,7 @@ async function testSuiFullFill() {
                 srcPublicWithdrawal: 120000n,
                 srcCancellation: 121000n,
                 srcPublicCancellation: 122000n,
-                dstWithdrawal: 10000n,
+                dstWithdrawal: 8000n,
                 dstPublicWithdrawal: 100000n,
                 dstCancellation: 101000n
             }
@@ -79,7 +88,12 @@ async function testSuiFullFill() {
         console.log('  Wallet ID:', walletId);
         
         // Wait for indexing
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('⏳ Waiting for indexing...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Optional: Wait to get a better auction price (comment out for immediate fill)
+        // console.log('⏳ Waiting 30 seconds for better auction price...');
+        // await new Promise(resolve => setTimeout(resolve, 30000));
         
         // Get wallet info
         const walletInfo = await resolverInstance.getWalletInfo(walletId);
@@ -87,13 +101,31 @@ async function testSuiFullFill() {
             throw new Error('Failed to get wallet info');
         }
         console.log('  Wallet balance:', walletInfo.balance.toString());
+        console.log('  Wallet making amount:', walletInfo.makingAmount.toString());
+        console.log('  Wallet taking amount:', walletInfo.takingAmount.toString());
+        console.log('  Wallet duration:', walletInfo.duration.toString());
+        console.log('  Wallet created at (ms):', walletInfo.createdAt.toString());
         
         // Calculate current taking amount (Dutch auction)
-        const currentTakingAmount = resolverInstance.getCurrentTakingAmount(
+        const currentTakingAmount = await resolverInstance.getCurrentTakingAmount(
             walletInfo,
             orderAmount
         );
+        
+        // Add a small buffer for network delays (add 5 seconds worth of price change)
+        const futureTime = Date.now() + 5000; // 5 seconds in the future
+        const bufferedTakingAmount = await resolverInstance.getCurrentTakingAmount(
+            walletInfo,
+            orderAmount,
+        );
+        
         console.log('  Current taking amount:', currentTakingAmount.toString());
+        console.log('  Buffered taking amount:', bufferedTakingAmount.toString());
+        console.log('  Min taking amount:', minTakingAmount.toString());
+        console.log('  Making amount:', orderAmount.toString());
+        console.log('  Wallet created at:', new Date(Number(walletInfo.createdAt)).toISOString());
+        console.log('  Current time:', new Date().toISOString());
+        console.log('  Duration:', walletInfo.duration.toString(), 'ms');
         
         // Step 2: Resolver creates source escrow
         console.log('\n2️⃣ Resolver creating source escrow...');
@@ -122,7 +154,7 @@ async function testSuiFullFill() {
                 srcPublicWithdrawal: 120000n,
                 srcCancellation: 121000n,
                 srcPublicCancellation: 122000n,
-                dstWithdrawal: 10000n,
+                dstWithdrawal: 8000n,
                 dstPublicWithdrawal: 100000n,
                 dstCancellation: 101000n
             }
