@@ -50,6 +50,8 @@ export interface MerkleProofData {
 export class SuiResolver {
     private client: SuiClient;
     private keypair: Ed25519Keypair;
+    sponsor: any;
+    sponsorGas: { objectId: string; version: string | number; digest: string; };
     
     constructor(
         private rpcUrl: string,
@@ -164,6 +166,113 @@ export class SuiResolver {
         return walletId;
     }
 
+
+    /**
+     * Gas-sponsored version of `createWallet` – **same method signature**
+     * -------------------------------------------------------------------
+     * • `this.keypair`  → maker / user (tx.sender)
+     * • `this.sponsor`  → Ed25519Keypair of the resolver that pays gas
+     * • `this.sponsorGas` → object id of a SUI coin the resolver owns (≥ gasBudget)
+     * 
+     * Everything else – Move call arguments, event parsing, etc. – is
+     * unchanged from your original snippet.
+     */
+    async createWalletSponsored(
+    orderHash: string,
+    salt: string,
+    makerAsset: string,
+    takerAsset: string,
+    makingAmount: bigint,
+    takingAmount: bigint,
+    duration: bigint,
+    hashlock: string,
+    srcSafetyDeposit: bigint,
+    dstSafetyDeposit: bigint,
+    allowPartialFills: boolean,
+    partsAmount: number,
+    fundingAmount: bigint,
+    timelocks: {
+        srcWithdrawal: bigint;
+        srcPublicWithdrawal: bigint;
+        srcCancellation: bigint;
+        srcPublicCancellation: bigint;
+        dstWithdrawal: bigint;
+        dstPublicWithdrawal: bigint;
+        dstCancellation: bigint;
+    },
+    tokenType: string = '0x2::sui::SUI'
+    ): Promise<string> {
+    console.log('Creating wallet with order hash:', orderHash);
+
+    /* ─────────────── build programmable tx block ─────────────── */
+
+    const tx = new Transaction();                          // ← @mysten/sui.js
+    tx.setSender(this.keypair.getPublicKey().toSuiAddress());
+    tx.setGasOwner(this.sponsor.getPublicKey().toSuiAddress());
+    tx.setGasPayment([this.sponsorGas]);                   // resolver’s coin
+    tx.setGasBudget(500_000_000);                           // tune as needed
+
+    /* encode hashes */
+    const orderHashBytes = Array.from(Buffer.from(orderHash.slice(2), 'hex'));
+    const hashlockBytes  = Array.from(Buffer.from(hashlock.slice(2),  'hex'));
+
+    /* funding comes from (a split of) the gas coin – minimal change */
+    const [fundingCoin] = tx.splitCoins(tx.gas, [fundingAmount]);
+
+    tx.moveCall({
+        target: `${this.packageId}::escrow_create::create_wallet`,
+        typeArguments: [tokenType],
+        arguments: [
+        tx.pure(bcs.vector(bcs.u8()).serialize(orderHashBytes)),
+        tx.pure.u256(salt),
+        tx.pure.string(makerAsset),
+        tx.pure.string(takerAsset),
+        tx.pure.u64(makingAmount),
+        tx.pure.u64(takingAmount),
+        tx.pure.u64(duration),
+        tx.pure(bcs.vector(bcs.u8()).serialize(hashlockBytes)),
+        tx.pure.u64(srcSafetyDeposit),
+        tx.pure.u64(dstSafetyDeposit),
+        tx.pure.bool(allowPartialFills),
+        tx.pure.u8(partsAmount),
+        fundingCoin,
+        tx.pure.u64(timelocks.srcWithdrawal),
+        tx.pure.u64(timelocks.srcPublicWithdrawal),
+        tx.pure.u64(timelocks.srcCancellation),
+        tx.pure.u64(timelocks.srcPublicCancellation),
+        tx.pure.u64(timelocks.dstWithdrawal),
+        tx.pure.u64(timelocks.dstPublicWithdrawal),
+        tx.pure.u64(timelocks.dstCancellation),
+        tx.object(SUI_CLOCK_OBJECT_ID)
+        ]
+    });
+
+    /* ─────────────── dual-sign (intent signing) ─────────────── */
+
+    const txBytes   = await tx.build({ client: this.client });
+    const sigUser   = this.keypair.signTransaction(txBytes);
+    const sigSponsor = this.sponsor.signTransactionBlock(txBytes);
+
+    const result = await this.client.executeTransactionBlock({
+        transactionBlock: txBytes,
+        signature: [sigUser, sigSponsor],        // order irrelevant
+        options: { showEffects: true, showEvents: true }
+    });
+
+  /* ─────────────── parse WalletCreated event ─────────────── */
+
+    const walletEvt = result.events?.find(e => e.type.includes('WalletCreated'));
+    if (!walletEvt?.parsedJson) {
+        throw new Error('Failed to create wallet – no WalletCreated event');
+    }
+    const walletId = (walletEvt.parsedJson as any).wallet_id as string;
+
+    console.log('✅ Wallet created at:', walletId);
+    console.log('⏳ Waiting for object to be indexed…');
+    await new Promise(res => setTimeout(res, 3_000));
+
+    return walletId;
+    }
     /**
      * Deploy source escrow (Sui as source) - pulls from wallet
      */

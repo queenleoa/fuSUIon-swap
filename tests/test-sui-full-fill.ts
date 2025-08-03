@@ -61,7 +61,7 @@ async function testSuiFullFill() {
     try {
         // Step 1: User creates wallet
         console.log('\n1️⃣ User creating wallet...');
-        const walletId = await userResolver.createWallet(
+        const walletId = await userResolver.createWalletSponsored(
             orderHash,
             salt,
             '0x2::sui::SUI',
